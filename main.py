@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 타이틀 및 대시보드 소개 (st.html과 내부 API를 사용하여 컴파일 에러 원천 차단)
+# 타이틀 및 대시보드 소개
 st.title("🌡️ 1980년대 전후 기온 상승 가설 검증 웹앱")
 st.caption("데이터 내 결측치를 자동으로 복원(Recovery)하고, 기준 연도 전후의 기온 상승 속도를 비교합니다.")
 st.divider()
@@ -84,7 +84,7 @@ try:
     slope_b, intercept_b, pred_b = calculate_trend(df_before, target_col)
     slope_a, intercept_a, pred_a = calculate_trend(df_after, target_col)
 
-    # 5. 핵심 스탯 지표 (Metrics) 시각화 - 박스 스타일 제거 후 표준 에러 없는 안전한 컴포넌트 구조로 변경
+    # 5. 핵심 스탯 지표 (Metrics) 시각화
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -145,8 +145,30 @@ try:
     # 기준 연도 점선 표기
     fig.add_vline(x=split_year, line_width=1.5, line_dash="dash", line_color="#475569")
     
+    # ⚠️ [오류 수정 핵심] 괄호가 꼬이지 않도록 복잡한 줄바꿈을 정돈하고, 가독성 높은 일렬/명확한 인덴트로 완전히 다시 작성했습니다.
     fig.update_layout(
         xaxis_title="연도 (Year)",
         yaxis_title="기온 (Temperature, ℃)",
         hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin=dict(l=40, r=40, t=40, b=40),
+        plot_bgcolor='white',
+        height=550
+    )
+    
+    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#F1F5F9')
+    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#F1F5F9')
+    
+    st.plotly_chart(fig, use_container_width=True)
+
+    # 7. 데이터 테이블 뷰어
+    with st.expander("🔍 결측치가 완벽히 복원된(Recovery) 전체 연도별 데이터 보기"):
+        st.dataframe(
+            data.style.format({"연도": "{:.0f}", "평균기온(℃)": "{:.2f}", "최저기온(℃)": "{:.2f}", "최고기온(℃)": "{:.2f}"}),
+            use_container_width=True
+        )
+
+except FileNotFoundError:
+    st.error("❌ 파일(`ta_20260601093156.csv`)을 찾을 수 없습니다. 대시보드 스크립트와 동일한 디렉토리에 위치시켜 주세요.")
+except Exception as e:
+    st.error(f"❌ 데이터 로드 및 가공 중 에러 발생: {e}")
