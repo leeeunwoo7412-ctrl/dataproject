@@ -4,23 +4,17 @@ import numpy as np
 import plotly.graph_objects as go
 from sklearn.linear_model import LinearRegression
 
-# 1. 페이지 기본 설정 및 스타일 정의
+# 1. 페이지 기본 설정
 st.set_page_config(
-    page_title="기온 상승 트렌드 분석 (결측치 리커버리 지원)",
+    page_title="기온 상승 트렌드 분석 (결측치 리커버리)",
     page_icon="🌡️",
     layout="wide"
 )
 
-st.markdown("""
-    <style>
-    .main-title { font-size: 2.2rem; font-weight: bold; color: #1E293B; margin-bottom: 5px; }
-    .sub-title { font-size: 1.1rem; color: #64748B; margin-bottom: 25px; }
-    .metric-container { background-color: #F8FAFC; padding: 15px; border-radius: 10px; border: 1px solid #E2E8F0; }
-    </style>
-""", unsafe_style_with_html=True)
-
-st.markdown('<div class="main-title">🌡️ 1980년대 전후 기온 상승 가설 검증 웹앱 (Recovery 기능 탑재)</div>', unsafe_style_with_html=True)
-st.markdown('<div class="sub-title">데이터 내 결측치를 자동으로 복원(Recovery)하고, 기준 연도 전후의 기온 상승 속도를 비교합니다.</div>', unsafe_style_with_html=True)
+# 타이틀 및 대시보드 소개 (st.html과 내부 API를 사용하여 컴파일 에러 원천 차단)
+st.title("🌡️ 1980년대 전후 기온 상승 가설 검증 웹앱")
+st.caption("데이터 내 결측치를 자동으로 복원(Recovery)하고, 기준 연도 전후의 기온 상승 속도를 비교합니다.")
+st.divider()
 
 # 2. [리커버리 핵심] 데이터 로드 및 누락값 자동 복원 전처리 함수
 @st.cache_data
@@ -39,11 +33,11 @@ def load_and_recover_data(file_path):
     
     target_cols = ['평균기온(℃)', '최저기온(℃)', '최고기온(℃)']
     
-    # ⭐ [리커버리] 기온 데이터가 누락된 경우, 앞뒤 데이터를 기반으로 한 선형 보간법(Linear Interpolation)으로 자동 복원
+    # ⭐ [리커버리] 기온 데이터가 누락된 경우, 앞뒤 데이터를 기반으로 한 선형 보간법으로 자동 복원
     for col in target_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
-            # 선형 보간 후, 처음이나 끝에 남은 결측치는 직전/직후 값으로 채움 (bfill, ffill)
+            # 선형 보간 후, 처음이나 끝에 남은 결측치는 직전/직후 값으로 채움
             df[col] = df[col].interpolate(method='linear').bfill().ffill()
             
     # 연도별 평균 데이터로 그룹화
@@ -55,7 +49,7 @@ try:
     data = load_and_recover_data("ta_20260601093156.csv")
     
     # 3. 사이드바 제어 패널
-    st.sidebar.markdown("### ⚙️ 분석 설정")
+    st.sidebar.header("⚙️ 분석 설정")
     st.sidebar.info("원하는 기온 지표와 기준 연도를 선택하면 대시보드가 실시간으로 업데이트됩니다.")
     
     target_col = st.sidebar.selectbox(
@@ -90,48 +84,39 @@ try:
     slope_b, intercept_b, pred_b = calculate_trend(df_before, target_col)
     slope_a, intercept_a, pred_a = calculate_trend(df_after, target_col)
 
-    # 5. 핵심 스탯 지표 (Metrics) 시각화
+    # 5. 핵심 스탯 지표 (Metrics) 시각화 - 박스 스타일 제거 후 표준 에러 없는 안전한 컴포넌트 구조로 변경
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown('<div class="metric-container">', unsafe_style_with_html=True)
         st.metric(
             label=f"📉 {split_year}년 이전 평균 기온", 
-            value=f"{df_before[target_col].mean():.2f} ℃"
+            value=f"{df_before[target_col].mean():.2f} ℃",
+            delta=f"10년당 +{slope_b * 10:.3f} ℃",
+            delta_color="inverse"
         )
-        st.markdown(f"**10년당 상승률:** <span style='color:#2563EB;'>+{slope_b * 10:.3f} ℃</span>", unsafe_style_with_html=True)
-        st.markdown('</div>', unsafe_style_with_html=True)
         
     with col2:
-        st.markdown('<div class="metric-container">', unsafe_style_with_html=True)
         mean_diff = df_after[target_col].mean() - df_before[target_col].mean()
         st.metric(
             label=f"📈 {split_year}년 이후 평균 기온", 
             value=f"{df_after[target_col].mean():.2f} ℃",
-            delta=f"+{mean_diff:.2f} ℃"
+            delta=f"10년당 +{slope_a * 10:.3f} ℃"
         )
-        st.markdown(f"**10년당 상승률:** <span style='color:#DC2626;'>+{slope_a * 10:.3f} ℃</span>", unsafe_style_with_html=True)
-        st.markdown('</div>', unsafe_style_with_html=True)
         
     with col3:
-        st.markdown('<div class="metric-container">', unsafe_style_with_html=True)
         rate_diff = (slope_a / slope_b) if slope_b > 0 else 0
-        status_text = "⚠️ 온난화 가속화 판정" if slope_a > slope_b else "✅ 온난화 둔화/안정화 판정"
+        status_text = "온난화 가속화" if slope_a > slope_b else "온난화 둔화"
         
         st.metric(
             label="🔄 기온 상승 속도 변화", 
-            value=f"{rate_diff:.1f} 배 빨라짐" if rate_diff > 1 else f"{rate_diff:.1f} 배 수준",
-            delta=status_text,
+            value=f"{rate_diff:.1f}배 속도",
+            delta=f"{status_text} 상태",
             delta_color="normal" if slope_a > slope_b else "inverse"
         )
-        st.markdown(f"전후 상승 폭 차이: **{abs(slope_a*10 - slope_b*10):.3f} ℃**", unsafe_style_with_html=True)
-        st.markdown('</div>', unsafe_style_with_html=True)
 
-    st.markdown("<br>", unsafe_style_with_html=True)
-
-    # 6. 인터랙티브 Plotly 차트 시각화
     st.subheader("📈 연도별 추세선 및 가설 검증 그래프")
     
+    # 6. 인터랙티브 Plotly 차트 시각화
     fig = go.Figure()
     
     # 전체 실제 데이터 산점도
@@ -164,25 +149,4 @@ try:
         xaxis_title="연도 (Year)",
         yaxis_title="기온 (Temperature, ℃)",
         hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        margin=dict(l=40, r=40, t=40, b=40),
-        plot_bgcolor='white',
-        height=550
-    )
-    
-    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#F1F5F9')
-    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#F1F5F9')
-    
-    st.plotly_chart(fig, use_container_width=True)
-
-    # 7. 데이터 테이블 뷰어
-    with st.expander("🔍 결측치가 완벽히 복원된(Recovery) 전체 연도별 데이터 보기"):
-        st.dataframe(
-            data.style.format({"연도": "{:.0f}", "평균기온(℃)": "{:.2f}", "최저기온(℃)": "{:.2f}", "최고기온(℃)": "{:.2f}"}),
-            use_container_width=True
-        )
-
-except FileNotFoundError:
-    st.error("❌ 파일(`ta_20260601093156.csv`)을 찾을 수 없습니다. 동일한 디렉토리에 위치시켜 주세요.")
-except Exception as e:
-    st.error(f"❌ 데이터 로드 및 가공 중 에러 발생: {e}")
+        legend=dict(orientation="h", yanchor="bottom", y=1.02,
